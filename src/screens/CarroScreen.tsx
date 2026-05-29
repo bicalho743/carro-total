@@ -1,173 +1,179 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, TextInput, Alert
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  TextInput, Modal, FlatList, TouchableWithoutFeedback, Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCalculadoraStore } from '../store/calculadoraStore';
-import { TAXAS_BR } from '../utils/financeiro';
 import { fmtMoeda } from '../utils/formatters';
 
-const ESTADOS = Object.keys(TAXAS_BR.ipva).sort();
+const ESTADOS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 
-export default function CarroScreen({ navigation }: any) {
+export default function CarroScreen({ irPara }: { irPara: (aba: string) => void }) {
   const store = useCalculadoraStore();
-  const [estadoOpen, setEstadoOpen] = useState(false);
+  const [estadoModal, setEstadoModal] = useState(false);
 
-  function campo(label: string, key: keyof typeof store, teclado = 'numeric', prefixo = '') {
-    return (
-      <View style={s.campo}>
-        <Text style={s.label}>{label}</Text>
-        <View style={s.inputRow}>
-          {prefixo ? <Text style={s.prefixo}>{prefixo}</Text> : null}
-          <TextInput
-            style={[s.input, prefixo ? { paddingLeft: 4 } : null]}
-            keyboardType={teclado as any}
-            value={String(store[key] ?? '')}
-            onChangeText={(v) => {
-              const num = parseFloat(v.replace(',', '.'));
-              store.setField(key as any, isNaN(num) ? 0 : num);
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
+  const combMes = store.kmMes > 0 && store.consumo > 0
+    ? (store.kmMes / store.consumo) * store.precoCombustivel : 0;
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 32 }}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
 
-      {/* FIPE Banner */}
-      {store.fipeModeloNome ? (
-        <TouchableOpacity style={s.fipeBanner} onPress={() => navigation.navigate('FipeSearch')}>
-          <Ionicons name="checkmark-circle" size={18} color="#27500A" />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={s.fipeBannerNome}>{store.fipeMarcaNome} {store.fipeModeloNome}</Text>
-            <Text style={s.fipeBannerVal}>FIPE: {fmtMoeda(store.fipeValor)} · Cód. {store.fipeCodigoFipe}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#3B6D11" />
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={s.fipeBannerEmpty} onPress={() => Alert.alert('Em breve', 'Busca FIPE disponível na próxima versão')}>
-          <Ionicons name="search-outline" size={18} color="#185FA5" />
-          <Text style={s.fipeBannerEmptyTxt}>Buscar modelo na tabela FIPE</Text>
-          <Ionicons name="chevron-forward" size={16} color="#185FA5" />
-        </TouchableOpacity>
-      )}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>VEÍCULO</Text>
 
-      {/* Card dados */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>
-          <Ionicons name="car-outline" size={15} /> Dados do veículo
-        </Text>
+          <Text style={s.label}>Valor do carro (R$)</Text>
+          <TextInput
+            style={s.input}
+            keyboardType="numeric"
+            placeholder="Ex: 80000"
+            placeholderTextColor="#CBD5E1"
+            returnKeyType="done"
+            blurOnSubmit={true}
+            onSubmitEditing={Keyboard.dismiss}
+            value={store.valorCarro > 0 ? String(store.valorCarro) : ''}
+            onChangeText={(v) => { const n = parseFloat(v.replace(',','.')); store.setField('valorCarro', isNaN(n) ? 0 : n); }}
+          />
 
-        {campo('Valor do carro', 'valorCarro', 'numeric', 'R$')}
-        {campo('Ano do modelo', 'anoModelo', 'number-pad')}
+          <Text style={[s.label, { marginTop: 12 }]}>Ano do modelo</Text>
+          <TextInput
+            style={s.input}
+            keyboardType="numeric"
+            placeholder="Ex: 2024"
+            placeholderTextColor="#CBD5E1"
+            returnKeyType="done"
+            blurOnSubmit={true}
+            onSubmitEditing={Keyboard.dismiss}
+            value={store.anoModelo > 0 ? String(store.anoModelo) : ''}
+            onChangeText={(v) => { const n = parseFloat(v.replace(',','.')); store.setField('anoModelo', isNaN(n) ? 0 : n); }}
+          />
 
-        {/* Estado / IPVA */}
-        <View style={s.campo}>
-          <Text style={s.label}>Estado — IPVA: {((TAXAS_BR.ipva[store.estado] ?? 0.04) * 100).toFixed(0)}%</Text>
-          <TouchableOpacity style={s.input} onPress={() => setEstadoOpen(!estadoOpen)}>
-            <Text style={{ color: '#1a1a2e', fontSize: 14 }}>{store.estado}</Text>
+          <Text style={[s.label, { marginTop: 12 }]}>Estado</Text>
+          <TouchableOpacity style={s.selectBtn} onPress={() => { Keyboard.dismiss(); setEstadoModal(true); }}>
+            <Text style={[{ fontSize: 14, color: store.estado ? '#0F172A' : '#CBD5E1' }]}>
+              {store.estado || 'Selecione o estado'}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#94A3B8" />
           </TouchableOpacity>
-          {estadoOpen && (
-            <View style={s.dropdown}>
-              {ESTADOS.map((uf) => (
-                <TouchableOpacity
-                  key={uf}
-                  style={s.dropItem}
-                  onPress={() => { store.setField('estado', uf); setEstadoOpen(false); }}
-                >
-                  <Text style={s.dropItemTxt}>{uf} — {(TAXAS_BR.ipva[uf] * 100).toFixed(0)}%</Text>
-                </TouchableOpacity>
-              ))}
+        </View>
+
+        <View style={s.card}>
+          <Text style={s.cardTitle}>USO E CONSUMO</Text>
+
+          <Text style={s.label}>Km por mês</Text>
+          <View style={s.inputRow}>
+            <TextInput
+              style={s.inputFlex}
+              keyboardType="numeric"
+              placeholder="Ex: 1500"
+              placeholderTextColor="#CBD5E1"
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onSubmitEditing={Keyboard.dismiss}
+              value={store.kmMes > 0 ? String(store.kmMes) : ''}
+              onChangeText={(v) => { const n = parseFloat(v.replace(',','.')); store.setField('kmMes', isNaN(n) ? 0 : n); }}
+            />
+            <Text style={s.sufixo}>km/mês</Text>
+          </View>
+
+          <Text style={[s.label, { marginTop: 12 }]}>Consumo médio</Text>
+          <View style={s.inputRow}>
+            <TextInput
+              style={s.inputFlex}
+              keyboardType="numeric"
+              placeholder="Ex: 12"
+              placeholderTextColor="#CBD5E1"
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onSubmitEditing={Keyboard.dismiss}
+              value={store.consumo > 0 ? String(store.consumo) : ''}
+              onChangeText={(v) => { const n = parseFloat(v.replace(',','.')); store.setField('consumo', isNaN(n) ? 0 : n); }}
+            />
+            <Text style={s.sufixo}>km/L</Text>
+          </View>
+
+          <Text style={[s.label, { marginTop: 12 }]}>Preço do combustível</Text>
+          <View style={s.inputRow}>
+            <TextInput
+              style={s.inputFlex}
+              keyboardType="decimal-pad"
+              placeholder="Ex: 6,20"
+              placeholderTextColor="#CBD5E1"
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onSubmitEditing={Keyboard.dismiss}
+              value={store.precoCombustivel > 0 ? String(store.precoCombustivel).replace('.', ',') : ''}
+              onChangeText={(v) => { const n = parseFloat(v.replace(',','.')); store.setField('precoCombustivel', isNaN(n) ? 0 : n); }}
+            />
+            <Text style={s.sufixo}>R$/L</Text>
+          </View>
+
+          {combMes > 0 && (
+            <View style={s.previewBox}>
+              <Ionicons name="flame-outline" size={14} color="#6366F1" />
+              <Text style={s.previewTxt}>
+                Combustível: <Text style={{ fontWeight: '700', color: '#4338CA' }}>{fmtMoeda(combMes)}/mês</Text>
+                {' · '}{(store.kmMes / store.consumo).toFixed(0)} litros
+              </Text>
             </View>
           )}
         </View>
-      </View>
 
-      {/* Card consumo */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>
-          <Ionicons name="speedometer-outline" size={15} /> Uso e consumo
-        </Text>
-        {campo('Km rodados por mês', 'kmMes', 'numeric')}
-        {campo('Consumo médio (km/L)', 'consumo', 'numeric')}
-        {campo('Preço gasolina (R$/L)', 'precoCombustivel', 'numeric', 'R$')}
+        <TouchableOpacity style={s.btnPrimary} onPress={() => { Keyboard.dismiss(); irPara('financ'); }}>
+          <Text style={s.btnPrimaryTxt}>Próxima: Financiamento</Text>
+          <Ionicons name="arrow-forward" size={18} color="#fff" />
+        </TouchableOpacity>
 
-        {/* Preview combustível */}
-        {store.kmMes > 0 && store.consumo > 0 && (
-          <View style={s.preview}>
-            <Text style={s.previewTxt}>
-              Combustível: {fmtMoeda((store.kmMes / store.consumo) * store.precoCombustivel)}/mês
-              · {(store.kmMes / store.consumo).toFixed(0)} L
-            </Text>
-          </View>
-        )}
-      </View>
+        <Modal visible={estadoModal} transparent animationType="slide">
+          <TouchableWithoutFeedback onPress={() => setEstadoModal(false)}>
+            <View style={s.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={s.modalSheet}>
+                  <Text style={s.modalTitle}>Selecione o estado</Text>
+                  <FlatList
+                    data={ESTADOS}
+                    keyExtractor={(i) => i}
+                    numColumns={4}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[s.chip, store.estado === item && s.chipActive]}
+                        onPress={() => { store.setField('estado', item); setEstadoModal(false); }}
+                      >
+                        <Text style={[s.chipTxt, store.estado === item && s.chipTxtActive]}>{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
-      {/* Botão próximo */}
-      <TouchableOpacity style={s.btnNext} onPress={() => navigation.navigate('Financiamento')}>
-        <Text style={s.btnNextTxt}>Financiamento</Text>
-        <Ionicons name="arrow-forward" size={18} color="#fff" />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={s.btnSkip} onPress={() => navigation.navigate('Resultado')}>
-        <Text style={s.btnSkipTxt}>Ver resultado direto →</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa', padding: 16 },
-  card: {
-    backgroundColor: '#fff', borderRadius: 12,
-    borderWidth: 0.5, borderColor: '#dee2e6',
-    padding: 16, marginBottom: 12,
-  },
-  cardTitle: { fontSize: 13, color: '#6c757d', fontWeight: '500', marginBottom: 14 },
-  campo: { marginBottom: 12 },
-  label: { fontSize: 12, color: '#6c757d', marginBottom: 4 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 0.5, borderColor: '#ced4da', borderRadius: 8 },
-  prefixo: { paddingLeft: 10, color: '#6c757d', fontSize: 14 },
-  input: {
-    flex: 1, padding: 10, fontSize: 14, color: '#1a1a2e',
-    borderWidth: 0.5, borderColor: '#ced4da', borderRadius: 8,
-  },
-  dropdown: {
-    borderWidth: 0.5, borderColor: '#ced4da', borderRadius: 8,
-    backgroundColor: '#fff', marginTop: 4, maxHeight: 200,
-  },
-  dropItem: { padding: 10, borderBottomWidth: 0.5, borderBottomColor: '#f1f3f5' },
-  dropItemTxt: { fontSize: 13, color: '#1a1a2e' },
-  preview: {
-    backgroundColor: '#f1f3f5', borderRadius: 8,
-    padding: 10, marginTop: 4,
-  },
-  previewTxt: { fontSize: 12, color: '#495057' },
-  fipeBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#EAF3DE', borderRadius: 10,
-    padding: 12, marginBottom: 12,
-    borderWidth: 0.5, borderColor: '#9FE1CB',
-  },
-  fipeBannerNome: { fontSize: 13, fontWeight: '500', color: '#27500A' },
-  fipeBannerVal: { fontSize: 11, color: '#3B6D11', marginTop: 2 },
-  fipeBannerEmpty: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#E6F1FB', borderRadius: 10,
-    padding: 12, marginBottom: 12,
-    borderWidth: 0.5, borderColor: '#B5D4F4', gap: 8,
-  },
-  fipeBannerEmptyTxt: { flex: 1, fontSize: 13, color: '#185FA5', fontWeight: '500' },
-  btnNext: {
-    backgroundColor: '#1a1a2e', borderRadius: 10,
-    padding: 16, flexDirection: 'row',
-    justifyContent: 'center', alignItems: 'center', gap: 8,
-    marginBottom: 8,
-  },
-  btnNextTxt: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  btnSkip: { alignItems: 'center', padding: 12 },
-  btnSkipTxt: { color: '#6c757d', fontSize: 13 },
+  container: { flex: 1, backgroundColor: '#F8FAFC', padding: 16 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 16, marginBottom: 12, elevation: 1 },
+  cardTitle: { fontSize: 11, color: '#6366F1', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  label: { fontSize: 12, color: '#64748B', marginBottom: 5, fontWeight: '500' },
+  input: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, backgroundColor: '#F8FAFC', padding: 11, fontSize: 14, color: '#0F172A' },
+  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, backgroundColor: '#F8FAFC' },
+  inputFlex: { flex: 1, padding: 11, fontSize: 14, color: '#0F172A' },
+  sufixo: { paddingRight: 12, color: '#94A3B8', fontSize: 13 },
+  selectBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, backgroundColor: '#F8FAFC', padding: 11 },
+  previewBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EEF2FF', borderRadius: 8, padding: 10, marginTop: 12 },
+  previewTxt: { fontSize: 12, color: '#4338CA', flex: 1 },
+  btnPrimary: { backgroundColor: '#6366F1', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, elevation: 4 },
+  btnPrimaryTxt: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 16, textAlign: 'center' },
+  chip: { flex: 1, margin: 4, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+  chipActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  chipTxt: { fontSize: 13, color: '#475569', fontWeight: '500' },
+  chipTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 });

@@ -12,26 +12,10 @@
       "backgroundColor": "#1a1a2e"
     },
     "assetBundlePatterns": ["**/*"],
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.corujalabs.carrototal"
-    },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a2e"
-      },
       "package": "com.corujalabs.carrototal",
       "versionCode": 1,
       "permissions": []
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": ""
-      }
     }
   }
 }
